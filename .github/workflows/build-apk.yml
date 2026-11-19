@@ -8,27 +8,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: mkdir app && unzip -q android_app.zip -d app
+      # The repo holds the app source as android_app.zip (or unzipped at the root)
+      - run: if [ -f android_app.zip ]; then mkdir app && unzip -q android_app.zip -d app; else mkdir app && cp -r $(ls -A | grep -v '^app$' | grep -v '^.git$') app/; fi
       - uses: actions/setup-java@v4
         with: { distribution: temurin, java-version: '17' }
       - uses: subosito/flutter-action@v2
         with: { channel: stable }
       - name: Build
         working-directory: app
-        run: |
-          # source fixes (v1.39.2) - safe to keep even after a fixed zip is uploaded
-          sed -i 's/items: const \[for/items: [for/' lib/screens/*.dart
-          sed -i 's/locationSettings: const LocationSettings(accuracy: LocationAccuracy.best)/desiredAccuracy: LocationAccuracy.best/' lib/screens/staff.dart
-          flutter create --platforms=android --org com.vlebazaar --project-name vlebazaar_hrms .
-          rm -f test/widget_test.dart
-          M=android/app/src/main/AndroidManifest.xml
-          sed -i 's#<application#<uses-permission android:name="android.permission.INTERNET"/>\n    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>\n    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>\n    <uses-permission android:name="android.permission.CAMERA"/>\n    <application#' $M
-          sed -i 's#android:label="[^"]*"#android:label="VLEBAZAAR HRMS"#' $M
-          sed -i 's/minSdk = .*/minSdk = 23/; s/minSdkVersion .*/minSdkVersion 23/' android/app/build.gradle* || true
-          flutter pub get
-          flutter analyze --no-fatal-infos --no-fatal-warnings
-          flutter test
-          flutter build apk --release
+        run: bash build.sh
       - uses: actions/upload-artifact@v4
         with:
           name: vlebazaar-hrms-apk
