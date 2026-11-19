@@ -8,8 +8,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      # The repo holds the app source as android_app.zip (or unzipped at the root)
-      - run: if [ -f android_app.zip ]; then mkdir app && unzip -q android_app.zip -d app; else mkdir app && cp -r $(ls -A | grep -v '^app$' | grep -v '^.git$') app/; fi
+        with: { fetch-depth: 0 }
+      # Use the most recently committed .zip (any name, e.g. "android_app (1).zip")
+      - name: Unpack newest app zip
+        run: |
+          Z=$(git log --diff-filter=AM --name-only --pretty=format: -- '*.zip' | grep -v '^$' | head -1)
+          echo "Using: $Z"
+          mkdir app && unzip -q "$Z" -d app
+          grep -q "assets/splash" app/pubspec.yaml && echo "splash: yes" || echo "splash: no (old zip?)"
       - uses: actions/setup-java@v4
         with: { distribution: temurin, java-version: '17' }
       - uses: subosito/flutter-action@v2
